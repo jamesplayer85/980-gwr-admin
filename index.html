@@ -34,6 +34,7 @@
     /* Shell */
     .shell{background:#fff;border-radius:var(--r);border:1px solid rgba(11,79,104,.11);box-shadow:0 12px 40px rgba(7,56,74,.1);overflow:hidden}
     .shell-header{background:var(--green);padding:18px 28px;display:flex;align-items:center;justify-content:space-between}
+    .shell-header-logos{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:#fff;border-bottom:1px solid var(--line)}
     .shell-header h1{margin:0;font-size:17px;font-weight:800;color:#fff}
     .shell-header p{margin:3px 0 0;font-size:12px;color:rgba(255,255,255,.7)}
     .shell-tabs{display:flex;gap:0;border-bottom:1px solid var(--line);background:#f8fbfc}
@@ -81,7 +82,33 @@
     .empty{color:var(--muted);font-size:13px;padding:24px 0;text-align:center}
     .loading-spinner{border:3px solid #e0e0e0;border-top-color:var(--green);border-radius:50%;width:28px;height:28px;animation:spin .7s linear infinite;margin:32px auto}
     @keyframes spin{to{transform:rotate(360deg)}}
-    @media(max-width:600px){.stats-row{grid-template-columns:1fr}.shell-tabs{overflow-x:auto}.tab-btn{white-space:nowrap}.tab-content{padding:16px 18px}.date-nav{flex-wrap:wrap}.date-nav .date-label{min-width:auto}}
+    @media(max-width:600px){
+      .page{width:100%;margin:0;border-radius:0}
+      .shell{border-radius:0;border-left:0;border-right:0}
+      .login-card{margin:20px auto;padding:24px 20px;border-radius:var(--r)}
+      .shell-header-logos{padding:12px 16px}
+      .shell-header-logos img{height:36px}
+      .shell-header-logos img:last-child{height:32px}
+      .shell-header{padding:14px 16px}
+      .shell-header h1{font-size:14px}
+      .stats-row{grid-template-columns:1fr 1fr;gap:10px}
+      .stat-card{padding:12px 14px}
+      .stat-card .val{font-size:22px}
+      .shell-tabs{overflow-x:auto}
+      .tab-btn{white-space:nowrap;padding:12px 14px;font-size:12px}
+      .tab-content{padding:14px 14px}
+      .card{padding:14px 14px}
+      .card-header{flex-direction:column;align-items:flex-start;gap:10px}
+      .date-nav{flex-wrap:wrap;gap:8px}
+      .date-nav .date-label{min-width:auto;font-size:14px;order:-1;width:100%;text-align:left}
+      .date-nav input[type=date]{width:100%}
+      table{font-size:12px}
+      th,td{padding:8px 8px}
+      .export-btn{width:100%;justify-content:center}
+    }
+    @media(max-width:380px){
+      .stats-row{grid-template-columns:1fr}
+    }
   </style>
 </head>
 <body>
@@ -89,6 +116,10 @@
 <!-- Login screen -->
 <div id="loginScreen">
   <div class="login-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--line);">
+      <img src="assets/location-works-logo-clean.png" alt="Location Works" style="height:40px;width:auto;">
+      <img src="assets/base-camp-logo-clean.png" alt="The Base Camp Co." style="height:36px;width:auto;">
+    </div>
     <h1>980 GWR Admin</h1>
     <p>Enter the admin password to access the site register.</p>
     <div class="field">
@@ -103,6 +134,10 @@
 <!-- Admin shell -->
 <div id="adminShell" class="page hidden">
   <div class="shell">
+    <div class="shell-header-logos">
+      <img src="assets/location-works-logo-clean.png" alt="Location Works" style="height:48px;width:auto;display:block;">
+      <img src="assets/base-camp-logo-clean.png" alt="The Base Camp Co." style="height:44px;width:auto;display:block;">
+    </div>
     <div class="shell-header">
       <div>
         <h1>980 Great West Road — Site Admin</h1>
@@ -155,7 +190,7 @@
 </div>
 
 <script>
-const WORKER_URL = 'https://basecamp-gwr.bt7frcbfh2.workers.dev'; // TODO: replace
+const WORKER_URL = 'https://basecamp-gwr.YOURSUBDOMAIN.workers.dev'; // TODO: replace
 
 const $ = id => document.getElementById(id);
 
