@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>980 GWR — Admin</title>
+  <style>
+    :root{--green:#18794e;--green2:#13603f;--ink:#14232b;--muted:#60727c;--line:#d7e1e5;--soft:#eef4f6;--danger:#b42318;--r:14px}
+    *{box-sizing:border-box}
+    html{min-height:100%;background:#eaf1f3}
+    body{margin:0;min-height:100vh;font-family:Inter,ui-sans-serif,-apple-system,sans-serif;background:linear-gradient(180deg,#f9fbfc,#eaf1f3);color:var(--ink)}
+    button,input,select{font:inherit}button{cursor:pointer}
+    .hidden{display:none!important}
+    .page{width:min(100% - 28px,1100px);margin:28px auto 52px}
+
+    /* Login */
+    .login-card{max-width:400px;margin:80px auto;background:#fff;border-radius:var(--r);border:1px solid var(--line);padding:36px;box-shadow:0 12px 40px rgba(7,56,74,.12)}
+    .login-card h1{margin:0 0 6px;font-size:22px;color:var(--ink)}
+    .login-card p{margin:0 0 24px;color:var(--muted);font-size:13px}
+    .field{margin-bottom:16px}
+    .field label{display:block;margin-bottom:6px;font-size:13px;font-weight:700;color:#29404b}
+    .field input{width:100%;padding:11px 14px;border:1.5px solid #cfdadd;border-radius:10px;font-size:15px;outline:none;transition:.15s}
+    .field input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(24,121,78,.1)}
+    .btn{border:0;border-radius:10px;padding:12px 22px;font-weight:700;font-size:14px;transition:.15s;min-height:46px}
+    .btn-green{color:#fff;background:var(--green)}
+    .btn-green:hover{background:var(--green2)}
+    .btn-ghost{color:var(--green);background:transparent;padding:8px 0}
+    .btn-secondary{color:var(--ink);background:var(--soft)}
+    .btn.block{width:100%}
+    .status{display:none;margin-top:12px;padding:11px 14px;border-radius:10px;font-size:13px}
+    .status.show{display:block}
+    .status.error{color:var(--danger);background:#fff0ee;border:1px solid #ffd2cc}
+
+    /* Shell */
+    .shell{background:#fff;border-radius:var(--r);border:1px solid rgba(11,79,104,.11);box-shadow:0 12px 40px rgba(7,56,74,.1);overflow:hidden}
+    .shell-header{background:var(--green);padding:18px 28px;display:flex;align-items:center;justify-content:space-between}
+    .shell-header h1{margin:0;font-size:17px;font-weight:800;color:#fff}
+    .shell-header p{margin:3px 0 0;font-size:12px;color:rgba(255,255,255,.7)}
+    .shell-tabs{display:flex;gap:0;border-bottom:1px solid var(--line);background:#f8fbfc}
+    .tab-btn{border:0;background:transparent;padding:14px 22px;font-size:13px;font-weight:700;color:var(--muted);border-bottom:3px solid transparent;transition:.15s}
+    .tab-btn.active{color:var(--green);border-bottom-color:var(--green);background:#fff}
+    .tab-btn:hover:not(.active){color:var(--ink)}
+    .tab-content{display:none;padding:24px 28px}
+    .tab-content.active{display:block}
+
+    /* Cards */
+    .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px;margin-bottom:16px}
+    .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .card-header h2{margin:0;font-size:16px;font-weight:700}
+    .card-header p{margin:4px 0 0;color:var(--muted);font-size:12px}
+
+    /* Date nav */
+    .date-nav{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+    .date-nav button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 14px;font-size:14px;font-weight:600;color:var(--ink)}
+    .date-nav button:hover{border-color:var(--green);color:var(--green)}
+    .date-nav .date-label{font-size:17px;font-weight:700;min-width:200px;text-align:center}
+    .date-nav input[type=date]{border:1.5px solid var(--line);border-radius:8px;padding:7px 12px;font-size:13px;outline:none}
+    .date-nav input[type=date]:focus{border-color:var(--green)}
+
+    /* Table */
+    .tbl-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{text-align:left;padding:9px 12px;background:#f4f8f9;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--line)}
+    td{padding:11px 12px;border-bottom:1px solid #f0f4f5;vertical-align:middle}
+    tr:last-child td{border-bottom:0}
+    tr:hover td{background:#f9fbfc}
+    .badge{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700}
+    .badge-green{background:#e9f7ef;color:var(--green)}
+    .badge-grey{background:#f1f3f4;color:#6b7b83}
+
+    /* Stats */
+    .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+    .stat-card{background:#f8fbfc;border:1px solid var(--line);border-radius:10px;padding:16px 20px}
+    .stat-card .val{font-size:28px;font-weight:800;color:var(--green)}
+    .stat-card .lbl{font-size:12px;color:var(--muted);margin-top:2px}
+
+    /* Export btn */
+    .export-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:1.5px solid var(--green);border-radius:8px;color:var(--green);font-weight:700;font-size:13px;background:#fff;cursor:pointer;text-decoration:none;transition:.15s}
+    .export-btn:hover{background:var(--green);color:#fff}
+
+    .empty{color:var(--muted);font-size:13px;padding:24px 0;text-align:center}
+    .loading-spinner{border:3px solid #e0e0e0;border-top-color:var(--green);border-radius:50%;width:28px;height:28px;animation:spin .7s linear infinite;margin:32px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media(max-width:600px){.stats-row{grid-template-columns:1fr}.shell-tabs{overflow-x:auto}.tab-btn{white-space:nowrap}.tab-content{padding:16px 18px}.date-nav{flex-wrap:wrap}.date-nav .date-label{min-width:auto}}
+  </style>
+</head>
+<body>
+
+<!-- Login screen -->
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>980 GWR Admin</h1>
+    <p>Enter the admin password to access the site register.</p>
+    <div class="field">
+      <label for="adminPass">Password</label>
+      <input type="password" id="adminPass" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn btn-green block" onclick="doLogin()">Sign in</button>
+    <div id="loginStatus" class="status"></div>
+  </div>
+</div>
+
+<!-- Admin shell -->
+<div id="adminShell" class="page hidden">
+  <div class="shell">
+    <div class="shell-header">
+      <div>
+        <h1>980 Great West Road — Site Admin</h1>
+        <p>Site access management portal</p>
+      </div>
+      <button class="btn btn-ghost" onclick="doLogout()" style="color:rgba(255,255,255,.8);">Sign out</button>
+    </div>
+    <div class="shell-tabs">
+      <button class="tab-btn active" onclick="switchTab('daily')" id="tab-daily">Daily Log</button>
+      <button class="tab-btn" onclick="switchTab('waiver')" id="tab-waiver">Waiver Register</button>
+    </div>
+
+    <!-- Daily Log Tab -->
+    <div id="content-daily" class="tab-content active">
+      <div class="date-nav">
+        <button onclick="shiftDay(-1)">‹ Prev</button>
+        <span class="date-label" id="dayLabel"></span>
+        <button onclick="shiftDay(1)">Next ›</button>
+        <input type="date" id="datePicker" onchange="loadDay($('#datePicker').value)">
+      </div>
+      <div class="stats-row" id="dayStats">
+        <div class="stat-card"><div class="val" id="statOnSite">—</div><div class="lbl">On site today</div></div>
+        <div class="stat-card"><div class="val" id="statVehicles">—</div><div class="lbl">With vehicles</div></div>
+        <div class="stat-card"><div class="val" id="statCompanies">—</div><div class="lbl">Companies / productions</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div><h2>Access log</h2><p id="daySubtitle">People whose entry pass has been sent for this date</p></div>
+          <button class="export-btn" onclick="exportDay()">↓ Export CSV</button>
+        </div>
+        <div id="dailyLogContent"><div class="loading-spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Waiver Register Tab -->
+    <div id="content-waiver" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div><h2>Waiver register</h2><p>All crew who have signed the Mandatory Health, Safety & Site Information</p></div>
+          <button class="export-btn" onclick="exportWaiver()">↓ Export CSV</button>
+        </div>
+        <div id="searchWrap" style="margin-bottom:16px">
+          <input type="text" id="waiverSearch" placeholder="Search by name, email or company…" oninput="filterWaiver()" style="width:100%;max-width:380px;padding:9px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;outline:none;">
+        </div>
+        <div id="waiverContent"><div class="loading-spinner"></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const WORKER_URL = 'basecamp-gwr.bt7frcbfh2.workers.dev'; // TODO: replace
+
+const $ = id => document.getElementById(id);
+
+let adminToken    = localStorage.getItem('gwr_admin_token') || '';
+let currentDay    = todayKey();
+let waiverRecords = [];
+
+function todayKey() {
+  const d = new Date();
+  return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-');
+}
+
+function longDate(k) {
+  if (!k) return '';
+  const [y,m,d] = k.split('-').map(Number);
+  return new Intl.DateTimeFormat('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(new Date(y,m-1,d,12));
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function api(method, ...args) {
+  const res = await fetch(WORKER_URL + '/admin-api', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method, token: adminToken, args })
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || 'Server error');
+  return data;
+}
+
+async function doLogin() {
+  const pass = $('adminPass').value;
+  const statusEl = $('loginStatus');
+  statusEl.className = 'status';
+  try {
+    const r = await api('adminLogin', pass);
+    adminToken = r.token;
+    localStorage.setItem('gwr_admin_token', adminToken);
+    $('loginScreen').classList.add('hidden');
+    $('adminShell').classList.remove('hidden');
+    initAdmin();
+  } catch(e) {
+    statusEl.textContent = e.message;
+    statusEl.className = 'status show error';
+  }
+}
+
+function doLogout() {
+  adminToken = '';
+  localStorage.removeItem('gwr_admin_token');
+  $('adminShell').classList.add('hidden');
+  $('loginScreen').classList.remove('hidden');
+  $('adminPass').value = '';
+}
+
+function switchTab(name) {
+  ['daily','waiver'].forEach(t => {
+    $('tab-' + t).classList.toggle('active', t === name);
+    $('content-' + t).classList.toggle('active', t === name);
+  });
+  if (name === 'waiver' && waiverRecords.length === 0) loadWaiver();
+}
+
+async function initAdmin() {
+  currentDay = todayKey();
+  $('datePicker').value = currentDay;
+  updateDayLabel();
+  await loadDay(currentDay);
+}
+
+function updateDayLabel() {
+  $('dayLabel').textContent = longDate(currentDay);
+  $('datePicker').value = currentDay;
+}
+
+function shiftDay(delta) {
+  const [y,m,d] = currentDay.split('-').map(Number);
+  const nd = new Date(y,m-1,d+delta,12);
+  currentDay = [nd.getFullYear(), String(nd.getMonth()+1).padStart(2,'0'), String(nd.getDate()).padStart(2,'0')].join('-');
+  updateDayLabel();
+  loadDay(currentDay);
+}
+
+async function loadDay(date) {
+  currentDay = date;
+  updateDayLabel();
+  $('dailyLogContent').innerHTML = '<div class="loading-spinner"></div>';
+  try {
+    const r = await api('getDailyLog', date);
+    renderDayLog(r.records || []);
+  } catch(e) {
+    $('dailyLogContent').innerHTML = `<p class="empty">Could not load log: ${escHtml(e.message)}</p>`;
+  }
+}
+
+function renderDayLog(records) {
+  $('statOnSite').textContent = records.length;
+  $('statVehicles').textContent = records.filter(r => r.vehicleRequired).length;
+  $('statCompanies').textContent = new Set(records.map(r => r.company)).size;
+
+  const isToday = currentDay === todayKey();
+  $('daySubtitle').textContent = records.length
+    ? `${records.length} entr${records.length===1?'y':'ies'} — passes sent${isToday?' today':' on '+longDate(currentDay)}`
+    : 'No passes have been sent for this date.';
+
+  if (!records.length) {
+    $('dailyLogContent').innerHTML = '<p class="empty">No access log entries for this date.</p>';
+    return;
+  }
+
+  const rows = records.map(r => `
+    <tr>
+      <td><strong>${escHtml(r.fullName)}</strong></td>
+      <td>${escHtml(r.email)}</td>
+      <td>${escHtml(r.company)}</td>
+      <td>${r.vehicleRequired ? `<span class="badge badge-green">${escHtml(r.vehicleReg)}</span>` : '<span class="badge badge-grey">No vehicle</span>'}</td>
+      <td style="color:var(--muted);font-size:12px;">${r.passSentAt ? new Date(r.passSentAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+      <td style="color:var(--muted);font-size:12px;font-family:monospace;">${escHtml(r.accessId)}</td>
+    </tr>`).join('');
+
+  $('dailyLogContent').innerHTML = `
+    <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Name</th><th>Email</th><th>Company / Production</th><th>Vehicle</th><th>Pass sent</th><th>Ref</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>`;
+}
+
+async function loadWaiver() {
+  $('waiverContent').innerHTML = '<div class="loading-spinner"></div>';
+  try {
+    const r = await api('getWaiverRegister');
+    waiverRecords = r.records || [];
+    renderWaiver(waiverRecords);
+  } catch(e) {
+    $('waiverContent').innerHTML = `<p class="empty">Could not load register: ${escHtml(e.message)}</p>`;
+  }
+}
+
+function filterWaiver() {
+  const q = $('waiverSearch').value.toLowerCase();
+  const filtered = q ? waiverRecords.filter(r =>
+    (r.fullName||'').toLowerCase().includes(q) ||
+    (r.email||'').toLowerCase().includes(q) ||
+    (r.company||'').toLowerCase().includes(q)
+  ) : waiverRecords;
+  renderWaiver(filtered);
+}
+
+function renderWaiver(records) {
+  if (!records.length) {
+    $('waiverContent').innerHTML = '<p class="empty">No waiver records found.</p>';
+    return;
+  }
+  const rows = records.map(r => `
+    <tr>
+      <td><strong>${escHtml(r.fullName)}</strong></td>
+      <td>${escHtml(r.email)}</td>
+      <td>${escHtml(r.company)}</td>
+      <td>${r.signedAt || '—'}</td>
+    </tr>`).join('');
+
+  $('waiverContent').innerHTML = `
+    <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Full name</th><th>Email</th><th>Company / Production</th><th>Signed date</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>
+    <p style="margin:12px 0 0;font-size:12px;color:var(--muted);">${records.length} record${records.length===1?'':'s'}</p>`;
+}
+
+async function exportDay() {
+  try {
+    const res = await fetch(WORKER_URL + '/admin-api', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method: 'exportAllLogs', token: adminToken, args: [] })
+    });
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = '980gwr-daily-log.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Export failed: ' + e.message); }
+}
+
+async function exportWaiver() {
+  try {
+    const res = await fetch(WORKER_URL + '/admin-api', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method: 'exportWaiverRegister', token: adminToken, args: [] })
+    });
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = '980gwr-waiver-register.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Export failed: ' + e.message); }
+}
+
+// Auto-login if token stored
+(async () => {
+  if (!adminToken) return;
+  try {
+    await api('getDailyLog', todayKey()); // validate token
+    $('loginScreen').classList.add('hidden');
+    $('adminShell').classList.remove('hidden');
+    initAdmin();
+  } catch {
+    adminToken = '';
+    localStorage.removeItem('gwr_admin_token');
+  }
+})();
+</script>
+</body>
+</html>
