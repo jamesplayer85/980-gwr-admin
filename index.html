@@ -78,6 +78,18 @@
     /* Export btn */
     .export-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:1.5px solid var(--green);border-radius:8px;color:var(--green);font-weight:700;font-size:13px;background:#fff;cursor:pointer;text-decoration:none;transition:.15s}
     .export-btn:hover{background:var(--green);color:#fff}
+    .colour-swatch{width:28px;height:28px;border-radius:50%;border:3px solid transparent;cursor:pointer;transition:.15s;flex-shrink:0;}
+    .colour-swatch.selected{border-color:#fff;box-shadow:0 0 0 2px #14232b;}
+    .colour-swatch:hover{transform:scale(1.15);}
+    .prod-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);}
+    .prod-row:last-child{border-bottom:0;}
+    .prod-dot{width:18px;height:18px;border-radius:50%;flex-shrink:0;}
+    .prod-name{flex:1;font-size:14px;font-weight:600;color:var(--ink);}
+    .prod-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em;}
+    .prod-badge-active{background:#e9f7ef;color:var(--green);}
+    .prod-badge-archived{background:#f1f3f4;color:#888;}
+    .prod-badge-locked{background:#e8f0fe;color:#1B4F8A;}
+    .prod-actions{display:flex;gap:6px;}
 
     .empty{color:var(--muted);font-size:13px;padding:24px 0;text-align:center}
     .loading-spinner{border:3px solid #e0e0e0;border-top-color:var(--green);border-radius:50%;width:28px;height:28px;animation:spin .7s linear infinite;margin:32px auto}
@@ -148,6 +160,50 @@
     <div class="shell-tabs">
       <button class="tab-btn active" onclick="switchTab('daily')" id="tab-daily">Daily Log</button>
       <button class="tab-btn" onclick="switchTab('waiver')" id="tab-waiver">Waiver Register</button>
+      <button class="tab-btn" onclick="switchTab('prods')" id="tab-prods">Production List</button>
+    </div>
+
+    <!-- Productions Tab -->
+    <div id="content-prods" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div><h2>Production list</h2><p>Active productions appear in the crew sign-in dropdown</p></div>
+          <button class="btn-teal btn" onclick="showAddProd()">+ Add production</button>
+        </div>
+
+        <!-- Add form (hidden by default) -->
+        <div id="addProdForm" style="display:none;background:#f8fbfc;border:1px solid var(--line);border-radius:10px;padding:16px 20px;margin-bottom:20px;">
+          <h3 style="margin:0 0 12px;font-size:14px;font-weight:700;">New production</h3>
+          <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+              <label style="display:block;font-size:11px;font-weight:700;color:#555;margin-bottom:5px;">Production name</label>
+              <input type="text" id="newProdName" placeholder="e.g. Warner Bros Production" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;outline:none;">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;font-weight:700;color:#555;margin-bottom:5px;">Pass colour</label>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;" id="colourPicker">
+                <button type="button" class="colour-swatch selected" data-colour="#006766" style="background:#006766;" title="Base Camp Teal" onclick="selectColour(this)"></button>
+                <button type="button" class="colour-swatch" data-colour="#1B4F8A" style="background:#1B4F8A;" title="Location Works Navy" onclick="selectColour(this)"></button>
+                <button type="button" class="colour-swatch" data-colour="#2563eb" style="background:#2563eb;" title="Blue" onclick="selectColour(this)"></button>
+                <button type="button" class="colour-swatch" data-colour="#7c3aed" style="background:#7c3aed;" title="Purple" onclick="selectColour(this)"></button>
+                <button type="button" class="colour-swatch" data-colour="#0891b2" style="background:#0891b2;" title="Cyan" onclick="selectColour(this)"></button>
+                <button type="button" class="colour-swatch" data-colour="#059669" style="background:#059669;" title="Green" onclick="selectColour(this)"></button>
+                <button type="button" class="colour-swatch" data-colour="#d97706" style="background:#d97706;" title="Amber" onclick="selectColour(this)"></button>
+                <button type="button" class="colour-swatch" data-colour="#ea580c" style="background:#ea580c;" title="Orange" onclick="selectColour(this)"></button>
+                <button type="button" class="colour-swatch" data-colour="#be185d" style="background:#be185d;" title="Pink" onclick="selectColour(this)"></button>
+                <button type="button" class="colour-swatch" data-colour="#374151" style="background:#374151;" title="Slate" onclick="selectColour(this)"></button>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-green" onclick="addProduction()">Add</button>
+              <button class="btn btn-secondary" onclick="hideAddProd()">Cancel</button>
+            </div>
+          </div>
+          <div id="addProdStatus" style="margin-top:8px;font-size:12px;color:var(--danger);display:none;"></div>
+        </div>
+
+        <div id="prodsContent"><div class="loading-spinner"></div></div>
+      </div>
     </div>
 
     <!-- Daily Log Tab -->
@@ -190,7 +246,7 @@
 </div>
 
 <script>
-const WORKER_URL = 'https://basecamp-gwr.bt7frcbfh2.workers.dev'; // TODO: replace
+const WORKER_URL = 'https://basecamp-gwr.bt7frcbfh2.workers.dev';
 
 const $ = id => document.getElementById(id);
 
@@ -250,11 +306,98 @@ function doLogout() {
 }
 
 function switchTab(name) {
-  ['daily','waiver'].forEach(t => {
+  ['daily','waiver','prods'].forEach(t => {
     $('tab-' + t).classList.toggle('active', t === name);
     $('content-' + t).classList.toggle('active', t === name);
   });
   if (name === 'waiver' && waiverRecords.length === 0) loadWaiver();
+  if (name === 'prods') loadProductions();
+}
+
+// ── Productions ──────────────────────────────────────────────────────
+var selectedColour = '#006766';
+
+function showAddProd() {
+  $('addProdForm').style.display = 'block';
+  $('newProdName').focus();
+}
+function hideAddProd() {
+  $('addProdForm').style.display = 'none';
+  $('newProdName').value = '';
+  $('addProdStatus').style.display = 'none';
+}
+function selectColour(btn) {
+  document.querySelectorAll('.colour-swatch').forEach(s => s.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedColour = btn.dataset.colour;
+}
+
+async function loadProductions() {
+  $('prodsContent').innerHTML = '<div class="loading-spinner"></div>';
+  try {
+    const r = await api('getProductions');
+    renderProductions(r.productions || []);
+  } catch(e) {
+    $('prodsContent').innerHTML = `<p class="empty">Could not load productions: ${escHtml(e.message)}</p>`;
+  }
+}
+
+function renderProductions(prods) {
+  if (!prods.length) { $('prodsContent').innerHTML = '<p class="empty">No productions yet.</p>'; return; }
+  const locked = ['The Base Camp Co.', 'Location Works'];
+  const active   = prods.filter(p => p.status === 'active');
+  const archived = prods.filter(p => p.status === 'archived');
+
+  function row(p) {
+    const isLocked = locked.includes(p.name);
+    const isActive = p.status === 'active';
+    return `<div class="prod-row">
+      <div class="prod-dot" style="background:${escHtml(p.colour)};"></div>
+      <span class="prod-name">${escHtml(p.name)}</span>
+      <span class="prod-badge ${isLocked ? 'prod-badge-locked' : (isActive ? 'prod-badge-active' : 'prod-badge-archived')}">
+        ${isLocked ? 'Protected' : (isActive ? 'Active' : 'Archived')}
+      </span>
+      <div class="prod-actions">
+        ${!isLocked && isActive  ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="toggleProd('${p.id}','archived')">Archive</button>` : ''}
+        ${!isLocked && !isActive ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="toggleProd('${p.id}','active')">Restore</button>` : ''}
+        ${!isLocked              ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;border-color:#e53935;color:#e53935;" onclick="deleteProd('${p.id}')">Delete</button>` : ''}
+      </div>
+    </div>`;
+  }
+
+  let html = '<div style="margin-bottom:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Active (' + active.length + ')</div>';
+  html += active.map(row).join('');
+  if (archived.length) {
+    html += '<div style="margin:16px 0 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Archived (' + archived.length + ')</div>';
+    html += archived.map(row).join('');
+  }
+  $('prodsContent').innerHTML = html;
+}
+
+async function addProduction() {
+  const name = $('newProdName').value.trim();
+  const statusEl = $('addProdStatus');
+  if (!name) { statusEl.textContent = 'Please enter a production name.'; statusEl.style.display='block'; return; }
+  try {
+    const r = await api('addProduction', { name, colour: selectedColour });
+    hideAddProd();
+    renderProductions(r.productions);
+  } catch(e) { statusEl.textContent = e.message; statusEl.style.display='block'; }
+}
+
+async function toggleProd(id, status) {
+  try {
+    const r = await api('updateProduction', { id, status });
+    renderProductions(r.productions);
+  } catch(e) { alert(e.message); }
+}
+
+async function deleteProd(id) {
+  if (!confirm('Delete this production? This cannot be undone.')) return;
+  try {
+    const r = await api('deleteProduction', id);
+    renderProductions(r.productions);
+  } catch(e) { alert(e.message); }
 }
 
 async function initAdmin() {
@@ -312,13 +455,14 @@ function renderDayLog(records) {
       <td>${r.vehicleRequired ? `<span class="badge badge-green">${escHtml(r.vehicleReg)}</span>` : '<span class="badge badge-grey">No vehicle</span>'}</td>
       <td style="color:var(--muted);font-size:12px;">${r.passSentAt ? new Date(r.passSentAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
       <td style="color:var(--muted);font-size:12px;font-family:monospace;">${escHtml(r.accessId)}</td>
+      <td><button onclick="resendPass('${escHtml(r.profileId)}','${escHtml(currentDay)}')" style="border:1px solid var(--green);background:#fff;color:var(--green);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">Resend</button></td>
     </tr>`).join('');
 
   $('dailyLogContent').innerHTML = `
     <div class="tbl-wrap">
     <table>
       <thead><tr>
-        <th>Name</th><th>Email</th><th>Company / Production</th><th>Vehicle</th><th>Pass sent</th><th>Ref</th>
+        <th>Name</th><th>Email</th><th>Company / Production</th><th>Vehicle</th><th>Pass sent</th><th>Ref</th><th></th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -367,6 +511,13 @@ function renderWaiver(records) {
     </table>
     </div>
     <p style="margin:12px 0 0;font-size:12px;color:var(--muted);">${records.length} record${records.length===1?'':'s'}</p>`;
+}
+
+async function resendPass(profileId, date) {
+  try {
+    const r = await api('resendPass', profileId, date);
+    alert(r.message || 'Pass resent.');
+  } catch(e) { alert('Failed: ' + e.message); }
 }
 
 async function exportDay() {
