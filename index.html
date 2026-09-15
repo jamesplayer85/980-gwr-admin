@@ -276,6 +276,19 @@
   </div>
 </div>
 
+<div id="passPreviewModal" class="modal-backdrop hidden">
+  <div class="modal-card" style="width:min(100%,560px)">
+    <div class="modal-head">
+      <div><h2>Entry pass preview</h2><p>This is exactly what was emailed to them.</p></div>
+      <button class="modal-close" onclick="closePassPreview()">×</button>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <div id="passPreviewLoading" style="padding:40px 0;text-align:center;color:var(--muted);font-size:13px;">Loading…</div>
+      <iframe id="passPreviewFrame" style="width:100%;height:540px;border:0;display:none;"></iframe>
+    </div>
+  </div>
+</div>
+
 <script>
 const WORKER_URL = 'https://basecamp-gwr.bt7frcbfh2.workers.dev';
 
@@ -436,7 +449,7 @@ async function deleteProd(id) {
 }
 
 // ── Crew instructions ────────────────────────────────────────────────
-const CREW_PORTAL_URL = 'https://jamesplayer85.github.io/980-gwr-signin/';
+const CREW_PORTAL_URL = 'https://980gwr.thebasecampco.com';
 
 function buildInstructionsText(p) {
   return [
@@ -549,7 +562,7 @@ function renderDayLog(records) {
       <td>${r.vehicleRequired ? `<span class="badge badge-green">${escHtml(r.vehicleReg)}</span>` : '<span class="badge badge-grey">No vehicle</span>'}</td>
       <td style="color:var(--muted);font-size:12px;">${r.passSentAt ? new Date(r.passSentAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
       <td style="color:var(--muted);font-size:12px;font-family:monospace;">${escHtml(r.accessId)}</td>
-      <td><button onclick="resendPass('${escHtml(r.profileId)}','${escHtml(currentDay)}')" style="border:1px solid var(--green);background:#fff;color:var(--green);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">Resend</button></td>
+      <td style="white-space:nowrap;"><button onclick="viewPass('${escHtml(r.profileId)}','${escHtml(currentDay)}')" style="border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;">View</button><button onclick="resendPass('${escHtml(r.profileId)}','${escHtml(currentDay)}')" style="border:1px solid var(--green);background:#fff;color:var(--green);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">Resend</button></td>
     </tr>`).join('');
 
   $('dailyLogContent').innerHTML = `
@@ -629,6 +642,36 @@ async function resendPass(profileId, date) {
   } catch(e) { alert('Failed: ' + e.message); }
 }
 
+async function viewPass(profileId, date) {
+  $('passPreviewLoading').style.display = 'block';
+  $('passPreviewLoading').textContent = 'Loading…';
+  $('passPreviewFrame').style.display = 'none';
+  $('passPreviewFrame').srcdoc = '';
+  $('passPreviewModal').classList.remove('hidden');
+  try {
+    const res = await fetch(WORKER_URL + '/admin-api', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method: 'getPassPreview', token: adminToken, args: [profileId, date] })
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Could not load the pass.');
+    }
+    const html = await res.text();
+    $('passPreviewFrame').srcdoc = html;
+    $('passPreviewFrame').style.display = 'block';
+    $('passPreviewLoading').style.display = 'none';
+  } catch(e) {
+    $('passPreviewLoading').textContent = 'Could not load pass: ' + e.message;
+  }
+}
+
+function closePassPreview() {
+  $('passPreviewModal').classList.add('hidden');
+  $('passPreviewFrame').srcdoc = '';
+}
+
 async function exportDay() {
   try {
     const res = await fetch(WORKER_URL + '/admin-api', {
@@ -677,8 +720,9 @@ async function exportWaiver() {
   }
 })();
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('instructionsModal').classList.contains('hidden')) closeInstructions(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('instructionsModal').classList.contains('hidden')) closeInstructions(); if (e.key === 'Escape' && !$('passPreviewModal').classList.contains('hidden')) closePassPreview(); });
 $('instructionsModal').addEventListener('click', e => { if (e.target === $('instructionsModal')) closeInstructions(); });
+$('passPreviewModal').addEventListener('click', e => { if (e.target === $('passPreviewModal')) closePassPreview(); });
 </script>
 </body>
 </html>
