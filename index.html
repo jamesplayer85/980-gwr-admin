@@ -121,6 +121,17 @@
     @media(max-width:380px){
       .stats-row{grid-template-columns:1fr}
     }
+    .prod-passcode{font-family:monospace;font-size:13px;font-weight:700;letter-spacing:.05em;color:var(--ink);background:#f4f8f9;border:1px solid var(--line);border-radius:6px;padding:3px 8px;}
+    .modal-backdrop{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:18px;background:rgba(7,30,42,.55);}
+    .modal-backdrop.hidden{display:none}
+    .modal-card{width:min(100%,560px);max-height:calc(100vh - 36px);overflow:auto;border-radius:16px;background:#fff;box-shadow:0 24px 70px rgba(0,0,0,.28)}
+    .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 22px 14px;border-bottom:1px solid var(--line)}
+    .modal-head h2{margin:0 0 4px;font-size:18px}
+    .modal-head p{margin:0;color:var(--muted);font-size:13px}
+    .modal-close{width:34px;height:34px;border:0;border-radius:8px;background:var(--soft);color:var(--green);font-size:20px;line-height:1;flex-shrink:0}
+    .modal-body{padding:20px 22px 24px}
+    #instructionsText{width:100%;min-height:260px;border:1.5px solid var(--line);border-radius:10px;padding:14px;font-size:13px;line-height:1.6;font-family:inherit;resize:vertical}
+    .modal-actions{display:flex;gap:10px;margin-top:16px}
   </style>
 </head>
 <body>
@@ -235,13 +246,33 @@
           <div><h2>Waiver register</h2><p>All crew who have signed the Mandatory Health, Safety & Site Information</p></div>
           <button class="export-btn" onclick="exportWaiver()">↓ Export CSV</button>
         </div>
-        <div id="searchWrap" style="margin-bottom:16px">
-          <input type="text" id="waiverSearch" placeholder="Search by name, email or company…" oninput="filterWaiver()" style="width:100%;max-width:380px;padding:9px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;outline:none;">
+        <div id="searchWrap" style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;">
+          <input type="text" id="waiverSearch" placeholder="Search by name, email or company…" oninput="filterWaiver()" style="flex:1;min-width:220px;max-width:380px;padding:9px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;outline:none;">
+          <select id="waiverCompanyFilter" onchange="filterWaiver()" style="padding:9px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;outline:none;background:#fff;">
+            <option value="">All companies / productions</option>
+          </select>
         </div>
         <div id="waiverContent"><div class="loading-spinner"></div></div>
       </div>
     </div>
 
+  </div>
+</div>
+
+<div id="instructionsModal" class="modal-backdrop hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div><h2 id="instructionsTitle">Crew instructions</h2><p>Copy this into an email to send to crew for this production.</p></div>
+      <button class="modal-close" onclick="closeInstructions()">×</button>
+    </div>
+    <div class="modal-body">
+      <textarea id="instructionsText" readonly></textarea>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeInstructions()">Close</button>
+        <button class="btn btn-green" onclick="copyInstructions()">Copy to clipboard</button>
+      </div>
+      <div id="instructionsStatus" style="margin-top:8px;font-size:12px;color:var(--green);display:none;"></div>
+    </div>
   </div>
 </div>
 
@@ -342,7 +373,9 @@ async function loadProductions() {
   }
 }
 
+var productionsCache = [];
 function renderProductions(prods) {
+  productionsCache = prods || [];
   if (!prods.length) { $('prodsContent').innerHTML = '<p class="empty">No productions yet.</p>'; return; }
   const locked = ['The Base Camp Co.', 'Location Works'];
   const active   = prods.filter(p => p.status === 'active');
@@ -354,10 +387,12 @@ function renderProductions(prods) {
     return `<div class="prod-row">
       <div class="prod-dot" style="background:${escHtml(p.colour)};"></div>
       <span class="prod-name">${escHtml(p.name)}</span>
+      ${isLocked ? '' : `<span class="prod-passcode" title="One-time crew verification code">${escHtml(p.passcode || '—')}</span>`}
       <span class="prod-badge ${isLocked ? 'prod-badge-locked' : (isActive ? 'prod-badge-active' : 'prod-badge-archived')}">
         ${isLocked ? 'Protected' : (isActive ? 'Active' : 'Archived')}
       </span>
       <div class="prod-actions">
+        ${!isLocked ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="openInstructions('${p.id}')">Instructions</button>` : ''}
         ${!isLocked && isActive  ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="toggleProd('${p.id}','archived')">Archive</button>` : ''}
         ${!isLocked && !isActive ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="toggleProd('${p.id}','active')">Restore</button>` : ''}
         ${!isLocked              ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;border-color:#e53935;color:#e53935;" onclick="deleteProd('${p.id}')">Delete</button>` : ''}
@@ -398,6 +433,65 @@ async function deleteProd(id) {
     const r = await api('deleteProduction', id);
     renderProductions(r.productions);
   } catch(e) { alert(e.message); }
+}
+
+// ── Crew instructions ────────────────────────────────────────────────
+const CREW_PORTAL_URL = 'https://jamesplayer85.github.io/980-gwr-signin/';
+
+function buildInstructionsText(p) {
+  return [
+    'Subject: 980 Great West Road \u2014 Site Access Registration',
+    '',
+    'Hi team,',
+    '',
+    'You\u2019ll need to register for site access ahead of working at 980 Great West Road.',
+    '',
+    '1. Go to: ' + CREW_PORTAL_URL,
+    '2. Register using your email address and complete the short sign-up (you\u2019ll need a profile photo, and to read and confirm the site Health & Safety information and Privacy Notice).',
+    '3. Once registered, select "' + p.name + '" as your company/production when requesting access dates.',
+    '4. The first time you request access under "' + p.name + '", you\u2019ll be asked for a one-time production passcode. Enter:',
+    '',
+    '   ' + (p.passcode || '(code not yet generated)'),
+    '',
+    'You only need to enter this once \u2014 after that you\u2019re verified for this production and won\u2019t be asked again.',
+    '',
+    'An entry pass will be emailed to you automatically on each day you\u2019re confirmed for access. Please have it ready to show security on arrival.',
+    '',
+    'Any questions, let us know.'
+  ].join('\n');
+}
+
+function openInstructions(id) {
+  const p = productionsCache.find(x => x.id === id);
+  if (!p) { alert('Could not find that production.'); return; }
+  $('instructionsTitle').textContent = 'Crew instructions \u2014 ' + p.name;
+  $('instructionsText').value = buildInstructionsText(p);
+  $('instructionsStatus').style.display = 'none';
+  $('instructionsModal').classList.remove('hidden');
+}
+
+function closeInstructions() {
+  $('instructionsModal').classList.add('hidden');
+}
+
+function copyInstructions() {
+  const text = $('instructionsText').value;
+  const done = () => {
+    const s = $('instructionsStatus');
+    s.textContent = 'Copied to clipboard.';
+    s.style.display = 'block';
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => {
+      $('instructionsText').select();
+      document.execCommand('copy');
+      done();
+    });
+  } else {
+    $('instructionsText').select();
+    document.execCommand('copy');
+    done();
+  }
 }
 
 async function initAdmin() {
@@ -474,19 +568,34 @@ async function loadWaiver() {
   try {
     const r = await api('getWaiverRegister');
     waiverRecords = r.records || [];
+    populateWaiverCompanyFilter();
     renderWaiver(waiverRecords);
   } catch(e) {
     $('waiverContent').innerHTML = `<p class="empty">Could not load register: ${escHtml(e.message)}</p>`;
   }
 }
 
+function populateWaiverCompanyFilter() {
+  const sel = $('waiverCompanyFilter');
+  const current = sel.value;
+  const companies = [...new Set(waiverRecords.map(r => (r.company || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+  sel.innerHTML = '<option value="">All companies / productions</option>'
+    + companies.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  if (companies.includes(current)) sel.value = current;
+}
+
 function filterWaiver() {
   const q = $('waiverSearch').value.toLowerCase();
-  const filtered = q ? waiverRecords.filter(r =>
-    (r.fullName||'').toLowerCase().includes(q) ||
-    (r.email||'').toLowerCase().includes(q) ||
-    (r.company||'').toLowerCase().includes(q)
-  ) : waiverRecords;
+  const company = $('waiverCompanyFilter').value;
+  const filtered = waiverRecords.filter(r => {
+    const matchesQuery = !q
+      || (r.fullName||'').toLowerCase().includes(q)
+      || (r.email||'').toLowerCase().includes(q)
+      || (r.company||'').toLowerCase().includes(q);
+    const matchesCompany = !company || (r.company||'') === company;
+    return matchesQuery && matchesCompany;
+  });
   renderWaiver(filtered);
 }
 
@@ -567,6 +676,9 @@ async function exportWaiver() {
     localStorage.removeItem('gwr_admin_token');
   }
 })();
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('instructionsModal').classList.contains('hidden')) closeInstructions(); });
+$('instructionsModal').addEventListener('click', e => { if (e.target === $('instructionsModal')) closeInstructions(); });
 </script>
 </body>
 </html>
