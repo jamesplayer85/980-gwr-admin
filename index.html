@@ -407,6 +407,7 @@ function renderProductions(prods) {
       <div class="prod-actions">
         ${!isLocked ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="openInstructions('${p.id}')">Instructions</button>` : ''}
         ${!isLocked ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="copyVipLink('${p.id}')">VIP link</button>` : ''}
+        ${!isLocked ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="copyGatehouseLink('${p.id}')">Gatehouse link</button>` : ''}
         ${!isLocked && isActive  ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="toggleProd('${p.id}','archived')">Archive</button>` : ''}
         ${!isLocked && !isActive ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="toggleProd('${p.id}','active')">Restore</button>` : ''}
         ${!isLocked              ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;border-color:#e53935;color:#e53935;" onclick="deleteProd('${p.id}')">Delete</button>` : ''}
@@ -529,7 +530,14 @@ function copyVipLink(id) {
   const p = productionsCache.find(x => x.id === id);
   if (!p || !p.vipToken) { alert('No VIP link found for this production yet \u2014 try refreshing the Production List tab.'); return; }
   const link = VIP_PORTAL_URL + '/?t=' + p.vipToken;
-  copyTextToClipboard(link, () => alert('VIP sign-in link for ' + p.name + ' copied to clipboard:\n\n' + link + '\n\nThis link lets the production add VIPs, download their passes, and sign their Health & Safety declaration on their behalf.'));
+  copyTextToClipboard(link, () => alert('VIP sign-in link for ' + p.name + ' copied to clipboard:\n\n' + link + '\n\nFor the production team: add VIPs, download their passes, and optionally sign their Health & Safety declaration on their behalf ahead of time.'));
+}
+
+function copyGatehouseLink(id) {
+  const p = productionsCache.find(x => x.id === id);
+  if (!p || !p.gatehouseToken) { alert('No gatehouse link found for this production yet \u2014 try refreshing the Production List tab.'); return; }
+  const link = VIP_PORTAL_URL + '/?g=' + p.gatehouseToken;
+  copyTextToClipboard(link, () => alert('Gatehouse sign-in link for ' + p.name + ' copied to clipboard:\n\n' + link + '\n\nFor reception/on arrival: cast and VIPs sign their own Health & Safety declaration on a tablet or phone when they enter.'));
 }
 
 async function initAdmin() {
