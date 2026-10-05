@@ -414,15 +414,15 @@ function renderProductions(prods) {
     return `<div class="prod-row">
       <div class="prod-dot" style="background:${escHtml(p.colour)};"></div>
       <span class="prod-name">${escHtml(p.name)}</span>
-      ${isLocked ? '' : `<span class="prod-passcode" title="One-time crew verification code">${escHtml(p.passcode || '—')}</span>`}
+      <span class="prod-passcode" title="One-time crew verification code">${escHtml(p.passcode || '—')}</span>
       <span class="prod-badge ${isLocked ? 'prod-badge-locked' : (isActive ? 'prod-badge-active' : 'prod-badge-archived')}">
         ${isLocked ? 'Protected' : (isActive ? 'Active' : 'Archived')}
       </span>
       <div class="prod-actions">
-        ${!isLocked ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="openInstructions('${p.id}')">Instructions</button>` : ''}
-        ${!isLocked ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="copyVipLink('${p.id}')">VIP link</button>` : ''}
-        ${!isLocked ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="copyGatehouseLink('${p.id}')">Gatehouse link</button>` : ''}
-        ${!isLocked ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="copyCrewListLink('${p.id}')">Crew list link</button>` : ''}
+        <button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="openInstructions('${p.id}')">Instructions</button>
+        <button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="copyVipLink('${p.id}')">VIP link</button>
+        <button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="copyGatehouseLink('${p.id}')">Gatehouse link</button>
+        <button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="copyCrewListLink('${p.id}')">Crew list link</button>
         ${!isLocked && isActive  ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="toggleProd('${p.id}','archived')">Archive</button>` : ''}
         ${!isLocked && !isActive ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="toggleProd('${p.id}','active')">Restore</button>` : ''}
         ${!isLocked              ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;border-color:#e53935;color:#e53935;" onclick="deleteProd('${p.id}')">Delete</button>` : ''}
