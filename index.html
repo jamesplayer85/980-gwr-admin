@@ -289,6 +289,20 @@
   </div>
 </div>
 
+<div id="sigModal" class="modal-backdrop hidden">
+  <div class="modal-card" style="width:min(100%,520px)">
+    <div class="modal-head">
+      <div><h2 id="sigModalName">Signed declaration</h2><p id="sigModalMeta"></p></div>
+      <button class="modal-close" onclick="closeSigModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="sigModalLoading" style="padding:30px 0;text-align:center;color:var(--muted);font-size:13px;">Loading…</div>
+      <img id="sigModalImg" alt="Signature" style="display:none;width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;">
+      <p id="sigModalNote" style="margin:12px 0 0;font-size:12px;color:var(--muted);"></p>
+    </div>
+  </div>
+</div>
+
 <script>
 const WORKER_URL = 'https://basecamp-gwr.bt7frcbfh2.workers.dev';
 
@@ -408,6 +422,7 @@ function renderProductions(prods) {
         ${!isLocked ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="openInstructions('${p.id}')">Instructions</button>` : ''}
         ${!isLocked ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="copyVipLink('${p.id}')">VIP link</button>` : ''}
         ${!isLocked ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="copyGatehouseLink('${p.id}')">Gatehouse link</button>` : ''}
+        ${!isLocked ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="copyCrewListLink('${p.id}')">Crew list link</button>` : ''}
         ${!isLocked && isActive  ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="toggleProd('${p.id}','archived')">Archive</button>` : ''}
         ${!isLocked && !isActive ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;" onclick="toggleProd('${p.id}','active')">Restore</button>` : ''}
         ${!isLocked              ? `<button class="export-btn" style="padding:5px 12px;font-size:11px;border-color:#e53935;color:#e53935;" onclick="deleteProd('${p.id}')">Delete</button>` : ''}
@@ -537,7 +552,14 @@ function copyGatehouseLink(id) {
   const p = productionsCache.find(x => x.id === id);
   if (!p || !p.gatehouseToken) { alert('No gatehouse link found for this production yet \u2014 try refreshing the Production List tab.'); return; }
   const link = VIP_PORTAL_URL + '/?g=' + p.gatehouseToken;
-  copyTextToClipboard(link, () => alert('Gatehouse sign-in link for ' + p.name + ' copied to clipboard:\n\n' + link + '\n\nFor reception/on arrival: cast and VIPs sign their own Health & Safety declaration on a tablet or phone when they enter.'));
+  copyTextToClipboard(link, () => alert('Gatehouse sign-in link for ' + p.name + ' copied to clipboard:\n\n' + link + '\n\nOpen page for this production: anyone with the link can read and sign the Health & Safety declaration on a tablet or phone (no pre-booking needed). Signatures appear in the Waiver Register.'));
+}
+
+function copyCrewListLink(id) {
+  const p = productionsCache.find(x => x.id === id);
+  if (!p || !p.crewToken) { alert('No crew list link found for this production yet \u2014 try refreshing the Production List tab.'); return; }
+  const link = VIP_PORTAL_URL + '/?c=' + p.crewToken;
+  copyTextToClipboard(link, () => alert('Crew list link for ' + p.name + ' copied to clipboard:\n\n' + link + '\n\nRead-only: a live list of who has a pass for the day (name, vehicle and parking). It can\u2019t be used to book VIPs or change anything.'));
 }
 
 async function initAdmin() {
@@ -680,23 +702,58 @@ function renderWaiver(records) {
     $('waiverContent').innerHTML = '<p class="empty">No waiver records found.</p>';
     return;
   }
-  const rows = records.map(r => `
+  const rows = records.map(r => {
+    const tag = r.source === 'onsite' ? '<span class="badge" style="margin-left:6px;background:#e8f0fe;color:#1a56b3;">On-site</span>'
+              : r.source === 'vip'    ? '<span class="badge" style="margin-left:6px;background:#fdf0d5;color:#8a5a00;">VIP</span>' : '';
+    const act = r.sigId
+      ? `<button onclick="viewSignature('${escHtml(r.sigId)}')" style="border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">View signature</button>`
+      : '';
+    return `
     <tr>
-      <td><strong>${escHtml(r.fullName)}</strong></td>
-      <td>${escHtml(r.email)}</td>
+      <td><strong>${escHtml(r.fullName)}</strong>${tag}</td>
+      <td>${escHtml(r.email || '—')}</td>
       <td>${escHtml(r.company)}</td>
-      <td>${r.signedAt || '—'}</td>
-    </tr>`).join('');
+      <td>${escHtml(r.signedAt || '—')}</td>
+      <td style="white-space:nowrap;">${act}</td>
+    </tr>`;
+  }).join('');
 
   $('waiverContent').innerHTML = `
     <div class="tbl-wrap">
     <table>
-      <thead><tr><th>Full name</th><th>Email</th><th>Company / Production</th><th>Signed date</th></tr></thead>
+      <thead><tr><th>Full name</th><th>Email</th><th>Company / Production</th><th>Signed date</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     </div>
     <p style="margin:12px 0 0;font-size:12px;color:var(--muted);">${records.length} record${records.length===1?'':'s'}</p>`;
 }
+
+async function viewSignature(sigId) {
+  const rec = waiverRecords.find(r => r.sigId === sigId);
+  if (!rec) return;
+  $('sigModalName').textContent = rec.fullName;
+  $('sigModalMeta').textContent = rec.company + ' \u00B7 signed ' + (rec.signedAt || '');
+  $('sigModalNote').textContent = rec.source === 'vip' && rec.signedBy ? 'Signed on their behalf by: ' + rec.signedBy
+                                : rec.source === 'onsite' ? 'Signed on site, on the production\u2019s Health & Safety link.' : '';
+  $('sigModalImg').style.display = 'none';
+  $('sigModalLoading').style.display = 'block'; $('sigModalLoading').textContent = 'Loading\u2026';
+  $('sigModal').classList.remove('hidden');
+  try {
+    const res = await fetch(WORKER_URL + '/admin-api', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method: 'getSignatureImage', token: adminToken, args: [sigId] })
+    });
+    if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Could not load the signature.'); }
+    const blob = await res.blob();
+    const url = await new Promise(resolve => { const fr = new FileReader(); fr.onload = () => resolve(fr.result); fr.readAsDataURL(blob); });
+    $('sigModalImg').src = url; $('sigModalImg').style.display = 'block'; $('sigModalLoading').style.display = 'none';
+  } catch (e) {
+    $('sigModalLoading').textContent = 'Could not load signature: ' + e.message;
+  }
+}
+function closeSigModal() { $('sigModal').classList.add('hidden'); $('sigModalImg').removeAttribute('src'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('sigModal').classList.contains('hidden')) closeSigModal(); });
+$('sigModal').addEventListener('click', e => { if (e.target === $('sigModal')) closeSigModal(); });
 
 async function resendPass(profileId, date) {
   try {
