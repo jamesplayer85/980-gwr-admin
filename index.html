@@ -233,8 +233,12 @@
       <div class="card">
         <div class="card-header">
           <div><h2>Access log</h2><p id="daySubtitle">People whose entry pass has been sent for this date</p><p id="parkingSummary" style="margin:4px 0 0;font-size:12px;font-weight:700;color:var(--green);"></p></div>
-          <button class="export-btn" onclick="exportDay()">↓ Export CSV</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="export-btn" onclick="previewRangeConversion()">Convert daily passes to range passes</button>
+            <button class="export-btn" onclick="exportDay()">↓ Export CSV</button>
+          </div>
         </div>
+        <div id="rangeConvertPanel" style="display:none;margin:0 0 16px;padding:16px;border:1.5px solid var(--green);border-radius:12px;background:#f4faf7;"></div>
         <div id="dailyLogContent"><div class="loading-spinner"></div></div>
       </div>
     </div>
@@ -336,6 +340,39 @@ async function api(method, ...args) {
   const data = await res.json();
   if (!res.ok || data.error) throw new Error(data.error || 'Server error');
   return data;
+}
+
+async function previewRangeConversion() {
+  const panel = $('rangeConvertPanel');
+  panel.style.display = 'block';
+  panel.innerHTML = '<p style="margin:0;font-size:13px;">Checking everyone with upcoming daily passes…</p>';
+  try {
+    const r = await api('convertLegacyRangePasses', false);
+    if (!r.count) { panel.innerHTML = '<p style="margin:0;font-size:13px;font-weight:700;">Nobody needs converting. No one has two or more consecutive upcoming daily passes.</p><button class="btn btn-secondary" style="margin-top:10px;" onclick="$(\'rangeConvertPanel\').style.display=\'none\'">Close</button>'; return; }
+    const fmt = k => { const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d,12).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); };
+    panel.innerHTML = `<p style="margin:0 0 8px;font-size:14px;font-weight:700;">${r.count} ${r.count===1?'person':'people'} will each get ONE range pass, emailed now.</p>
+      <p style="margin:0 0 10px;font-size:12px;color:var(--muted);">Their consecutive daily passes become a single pass valid until the last day. Nothing has been sent yet.</p>
+      <div style="max-height:260px;overflow:auto;background:#fff;border:1px solid #dfe9e4;border-radius:8px;"><table style="width:100%;font-size:12px;border-collapse:collapse;"><thead><tr style="text-align:left;"><th style="padding:6px 10px;">Name</th><th>Company</th><th>Valid</th><th>Days</th></tr></thead><tbody>${r.people.map(x=>`<tr style="border-top:1px solid #eef3f0;"><td style="padding:6px 10px;">${escHtml(x.name)}</td><td>${escHtml(x.company)}</td><td>${fmt(x.from)} – ${fmt(x.to)}${x.weekdaysOnly?' (Mon–Fri)':''}</td><td>${x.days}${x.otherUpcomingDaysLeftAlone?` <span style="color:var(--muted);">+${x.otherUpcomingDaysLeftAlone} other left as is</span>`:''}</td></tr>`).join('')}</tbody></table></div>
+      <div style="margin-top:12px;display:flex;gap:8px;"><button class="btn btn-green" onclick="applyRangeConversion(this)">Convert and email ${r.count} ${r.count===1?'pass':'passes'}</button><button class="btn btn-secondary" onclick="$('rangeConvertPanel').style.display='none'">Cancel</button></div>`;
+  } catch (e) {
+    panel.innerHTML = '<p style="margin:0;font-size:13px;color:#e53935;">' + escHtml(e.message) + '</p>';
+  }
+}
+
+async function applyRangeConversion(btn) {
+  btn.disabled = true; btn.textContent = 'Converting and emailing…';
+  const panel = $('rangeConvertPanel');
+  try {
+    const r = await api('convertLegacyRangePasses', true);
+    const ok = r.people.filter(x => x.status.startsWith('converted')).length;
+    const bad = r.people.filter(x => x.status.startsWith('failed'));
+    panel.innerHTML = `<p style="margin:0 0 8px;font-size:14px;font-weight:700;">${ok} of ${r.count} converted.</p>` +
+      (bad.length ? `<p style="margin:0 0 8px;font-size:12px;color:#e53935;">Failed: ${bad.map(x=>escHtml(x.name)+' ('+escHtml(x.status)+')').join('; ')}. Run it again to retry only these.</p>` : '') +
+      `<button class="btn btn-secondary" onclick="$('rangeConvertPanel').style.display='none'">Close</button>`;
+    try { loadDay(currentDay); } catch(e){}
+  } catch (e) {
+    panel.innerHTML = '<p style="margin:0;font-size:13px;color:#e53935;">' + escHtml(e.message) + '</p>';
+  }
 }
 
 async function doLogin() {
