@@ -172,6 +172,7 @@
       <button class="tab-btn active" onclick="switchTab('daily')" id="tab-daily">Daily Log</button>
       <button class="tab-btn" onclick="switchTab('waiver')" id="tab-waiver">Waiver Register</button>
       <button class="tab-btn" onclick="switchTab('prods')" id="tab-prods">Production List</button>
+      <button class="tab-btn" onclick="switchTab('master')" id="tab-master">Master Vehicle List</button>
     </div>
 
     <!-- Productions Tab -->
@@ -234,12 +235,31 @@
         <div class="card-header">
           <div><h2>Access log</h2><p id="daySubtitle">People whose entry pass has been sent for this date</p><p id="parkingSummary" style="margin:4px 0 0;font-size:12px;font-weight:700;color:var(--green);"></p></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="export-btn" onclick="sendMissingPasses(this)">Send missing passes now</button>
             <button class="export-btn" onclick="previewRangeConversion()">Convert daily passes to range passes</button>
             <button class="export-btn" onclick="exportDay()">↓ Export CSV</button>
           </div>
         </div>
         <div id="rangeConvertPanel" style="display:none;margin:0 0 16px;padding:16px;border:1.5px solid var(--green);border-radius:12px;background:#f4faf7;"></div>
         <div id="dailyLogContent"><div class="loading-spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Master Vehicle List Tab -->
+    <div id="content-master" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div><h2>Master vehicle list</h2><p>Every vehicle that has had access on an active production, past or upcoming. Archived productions are not shown.</p><p id="masterSummary" style="margin:4px 0 0;font-size:12px;font-weight:700;color:var(--green);"></p></div>
+          <button class="export-btn" onclick="exportMaster()">↓ Export CSV</button>
+        </div>
+        <div style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="masterSearch" placeholder="Search by name or registration…" oninput="renderMaster()" style="flex:1;min-width:220px;max-width:380px;padding:9px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;outline:none;">
+          <select id="masterProdFilter" onchange="renderMaster()" style="padding:9px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;outline:none;background:#fff;">
+            <option value="">All active productions</option>
+          </select>
+          <label style="font-size:13px;display:flex;align-items:center;gap:6px;"><input type="checkbox" id="masterToday" onchange="loadMaster()"> On site today only</label>
+        </div>
+        <div id="masterContent"><div class="loading-spinner"></div></div>
       </div>
     </div>
 
@@ -342,6 +362,23 @@ async function api(method, ...args) {
   return data;
 }
 
+async function sendMissingPasses(btn) {
+  const panel = $('rangeConvertPanel');
+  panel.style.display = 'block';
+  btn.disabled = true;
+  panel.innerHTML = '<p style="margin:0;font-size:13px;">Sending any passes for ' + escHtml(currentDay) + ' that have not gone out…</p>';
+  try {
+    const r = await api('sendMissingPasses', currentDay);
+    const bad = r.errors || [];
+    panel.innerHTML = `<p style="margin:0 0 6px;font-size:14px;font-weight:700;">${r.sent} pass${r.sent===1?'':'es'} sent just now.</p>` +
+      (bad.length ? `<p style="margin:0 0 8px;font-size:12px;color:#e53935;">${bad.length} could not be sent:<br>${bad.map(escHtml).join('<br>')}</p><p style="margin:0 0 8px;font-size:12px;color:var(--muted);">If these say 429 or "daily limit", check your Resend plan quota. Press the button again to retry.</p>` : '<p style="margin:0 0 8px;font-size:12px;color:var(--muted);">Nothing else is outstanding for this date.</p>') +
+      `<button class="btn btn-secondary" onclick="$('rangeConvertPanel').style.display='none'">Close</button>`;
+    try { loadDay(currentDay); } catch(e){}
+  } catch (e) {
+    panel.innerHTML = '<p style="margin:0;font-size:13px;color:#e53935;">' + escHtml(e.message) + '</p>';
+  } finally { btn.disabled = false; }
+}
+
 async function previewRangeConversion() {
   const panel = $('rangeConvertPanel');
   panel.style.display = 'block';
@@ -401,12 +438,66 @@ function doLogout() {
 }
 
 function switchTab(name) {
-  ['daily','waiver','prods'].forEach(t => {
+  ['daily','waiver','prods','master'].forEach(t => {
     $('tab-' + t).classList.toggle('active', t === name);
     $('content-' + t).classList.toggle('active', t === name);
   });
   if (name === 'waiver' && waiverRecords.length === 0) loadWaiver();
   if (name === 'prods') loadProductions();
+  if (name === 'master') loadMaster();
+}
+
+// ── Master vehicle list ──────────────────────────────────────────────
+var masterRows = [];
+
+async function loadMaster() {
+  $('masterContent').innerHTML = '<div class="loading-spinner"></div>';
+  try {
+    const r = await api('getMasterList', $('masterToday').checked);
+    masterRows = r.rows || [];
+    const sel = $('masterProdFilter'), cur = sel.value;
+    const prods = [...new Set(masterRows.map(x => x.production))].sort();
+    sel.innerHTML = '<option value="">All active productions</option>' + prods.map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
+    if (prods.includes(cur)) sel.value = cur;
+    renderMaster();
+  } catch(e) {
+    $('masterContent').innerHTML = `<p class="empty">Could not load list: ${escHtml(e.message)}</p>`;
+  }
+}
+
+function renderMaster() {
+  const q = $('masterSearch').value.trim().toLowerCase();
+  const prod = $('masterProdFilter').value;
+  const rows = masterRows.filter(r => (!prod || r.production === prod)
+    && (!q || r.name.toLowerCase().includes(q) || r.reg.toLowerCase().includes(q)));
+  const regs = new Set(rows.map(r => r.reg)).size;
+  $('masterSummary').textContent = rows.length ? `${regs} vehicle${regs===1?'':'s'} · ${new Set(rows.map(r => r.production)).size} production${new Set(rows.map(r => r.production)).size===1?'':'s'}` : '';
+  if (!rows.length) { $('masterContent').innerHTML = '<p class="empty">No vehicles found for active productions.</p>'; return; }
+  const fmt = k => { const [y,m,d] = k.split('-').map(Number); return new Date(y,m-1,d,12).toLocaleDateString('en-GB',{day:'numeric',month:'short'}); };
+  const parking = t => t === 'onsite' ? '<span class="badge badge-green">On site</span>' : t === 'dropoff' ? '<span class="badge badge-grey">Drop-off</span>' : '<span style="color:var(--muted);">—</span>';
+  $('masterContent').innerHTML = `<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Vehicle reg</th><th>Production</th><th>Parking</th><th>Type</th><th>Access dates</th></tr></thead><tbody>${rows.map(r => `<tr>
+    <td><strong>${escHtml(r.name)}</strong>${r.email ? `<div style="font-size:11px;color:var(--muted);">${escHtml(r.email)}</div>` : ''}</td>
+    <td><span class="badge badge-green">${escHtml(r.reg)}</span></td>
+    <td>${escHtml(r.production)}</td>
+    <td>${parking(r.parkingType)}</td>
+    <td>${r.source === 'VIP' ? '<span class="badge" style="background:#fdf0d5;color:#8a5a00;">VIP</span>' : 'Crew'}${r.onSiteToday ? ' <span class="badge badge-green">On site today</span>' : ''}</td>
+    <td style="font-size:12px;white-space:nowrap;">${r.from === r.to ? fmt(r.from) : fmt(r.from) + ' – ' + fmt(r.to)} <span style="color:var(--muted);">(${r.days} day${r.days===1?'':'s'})</span></td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
+async function exportMaster() {
+  try {
+    const res = await fetch(WORKER_URL + '/admin-api', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method: 'exportMasterList', token: adminToken, args: [$('masterToday').checked] })
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = '980gwr-master-vehicle-list.csv'; a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Export failed: ' + e.message); }
 }
 
 // ── Productions ──────────────────────────────────────────────────────
